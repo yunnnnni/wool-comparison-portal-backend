@@ -5,6 +5,11 @@ import time
 from typing import Dict, List
 from random import randint
 import itertools
+import logging
+
+
+logging.basicConfig(format="[%(asctime)s] %(levelname)-8s %(filename)s:%(lineno)s(%(funcName)s): %(message)s",
+                    level=logging.DEBUG)
 
 
 class WoolPlatzCrawler:
@@ -18,19 +23,26 @@ class WoolPlatzCrawler:
         }
         self.account = account
         self.query_url = query_url
+        self.logger = logging.getLogger()
 
     def get_product_info(self, mark: str, product: str) -> List[Dict]:
+        self.logger.debug(f"mark={mark}, product={product}")
         product_root_url = self.get_product_url(f"{mark} {product}")
         target_product_list = self.get_sub_types(product_root_url)
         product_info_list = []
         for target_product in target_product_list:
+            self.logger.debug(f"target_product={target_product}")
             product_url = self.get_product_url(target_product)
             product_info = self.parse_product_info(product_url)
-            product_info_list.append(product_info)
-            time.sleep(randint(100, 1000) / 1000)
+            if len(product_info) > 0:
+                product_info_list.append(product_info)
+                time_to_sleep = randint(100, 1000) / 1000
+                self.logger.debug(f"time_to_sleep={time_to_sleep}")
+                time.sleep(time_to_sleep)
         return product_info_list
 
     def get_product_url(self, product_name: str) -> str:
+        self.logger.debug(f"product_name={product_name}")
         query_params = {
             "type": "suggest",
             "searchQuery": product_name,
@@ -43,19 +55,27 @@ class WoolPlatzCrawler:
             r = requests.get(self.query_url, params=query_params, headers=self.headers)
             html_doc = re.findall(r"\"html\":\"(.*)\"", str(r.content))[0].replace("\\\\n", " ").replace("\\\\t", " ").replace(
                 "\\\\", "")
-            soup = BeautifulSoup(html_doc)
+            soup = BeautifulSoup(html_doc, "html.parser")
             product_url_list = soup.find_all("a", {"class": "productlist-imgholder"}, href=True)
             if len(product_url_list) == 0:
-                raise ValueError
+                raise ValueError("can't find product url")
             product_url = product_url_list[0]["href"]  # get url of the first element
+            self.logger.debug(f"product_url={product_url}")
             return product_url
         except Exception as e:
+            self.logger.warning(f"error={e}")
             return ""
 
     def parse_product_info(self, product_url: str) -> Dict:
+        self.logger.debug(f"product_url={product_url}")
         try:
+            if not isinstance(product_url, str):
+                raise TypeError("product_url is not a string!")
+            if not product_url:
+                raise ValueError("product_url is empty, can't parse product info")
+
             r = requests.get(product_url, headers=self.headers)
-            soup = BeautifulSoup(r.content)
+            soup = BeautifulSoup(r.content, "html.parser")
 
             product_info = {}
             product_info["Artikel"] = soup.find(id="pageheadertitle").text
@@ -76,31 +96,40 @@ class WoolPlatzCrawler:
 
             return product_info
         except Exception as e:
+            self.logger.warning(f"error={e}")
             return {}
 
     def get_sub_types(self, product_url: str) -> List[str]:
+        self.logger.debug(f"product_url={product_url}")
         try:
+            if not isinstance(product_url, str):
+                raise TypeError("product_url is not a string!")
+            if not product_url:
+                raise ValueError("product_url is empty, can't parse product info")
+
             r = requests.get(product_url, headers=self.headers)
-            soup = BeautifulSoup(r.content)
+            soup = BeautifulSoup(r.content, "html.parser")
 
             variant_name = soup.find("span", {"class": "variants-title-txt"}).text
             soup.find_all("div", {"class": "variants-sb-box-item"})
             sub_types = []
             for ele in soup.find_all("div", {"class": "variants-sb-box-item"}):
+                # FIXME: product name in data-list-text is not always correct
                 sub_types.append(f"{variant_name} {ele.find('span')['data-list-text']}")
-
+            self.logger.debug(f"sub_types={sub_types}")
             return sub_types
         except Exception as e:
+            self.logger.warning(f"error={e}")
             return []
 
 
 if __name__ == "__main__":
     target_list = [
-        {"mark": "DMC", "product": "Natura XL"},
+        # {"mark": "DMC", "product": "Natura XL"},
         {"mark": "Drops", "product": "Safran"},
-        {"mark": "Drops", "product": "Baby Merino Mix"},
-        {"mark": "Hahn", "product": "Alpacca Speciale"},
-        {"mark": "Stylecraft", "product": "Special double knit"}
+        # {"mark": "Drops", "product": "Baby Merino Mix"},
+        # {"mark": "Hahn", "product": "Alpacca Speciale"},
+        # {"mark": "Stylecraft", "product": "Special double knit"}
     ]
 
     crawler = WoolPlatzCrawler()
