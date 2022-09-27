@@ -43,15 +43,17 @@ class WoolPlatzCrawler:
 
     def get_product_url(self, product_name: str) -> str:
         self.logger.debug(f"product_name={product_name}")
-        query_params = {
-            "type": "suggest",
-            "searchQuery": product_name,
-            "sortBy": 0,
-            "offset": 0,
-            "limit": 16,
-            "account": self.account  # TODO: will account expire? get account automatically
-        }
         try:
+            if len(product_name) == 0:
+                raise ValueError("product_name is empty")
+            query_params = {
+                "type": "suggest",
+                "searchQuery": product_name,
+                "sortBy": 0,
+                "offset": 0,
+                "limit": 16,
+                "account": self.account  # TODO: will account expire? get account automatically
+            }
             r = requests.get(self.query_url, params=query_params, headers=self.headers)
             html_doc = re.findall(r"\"html\":\"(.*)\"", str(r.content))[0].replace("\\\\n", " ").replace("\\\\t", " ").replace(
                 "\\\\", "")
@@ -115,7 +117,12 @@ class WoolPlatzCrawler:
             sub_types = []
             for ele in soup.find_all("div", {"class": "variants-sb-box-item"}):
                 # FIXME: product name in data-list-text is not always correct
-                sub_types.append(f"{variant_name} {ele.find('span')['data-list-text']}")
+                try:
+                    color = ele.find('span')['data-list-text']
+                    sub_types.append(f"{variant_name} {color}")
+                except Exception as e:
+                    self.logger.warning(f"error={e}")
+                    continue
             self.logger.debug(f"sub_types={sub_types}")
             return sub_types
         except Exception as e:
