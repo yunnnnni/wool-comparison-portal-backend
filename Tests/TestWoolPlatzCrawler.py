@@ -10,13 +10,19 @@ class TestWoolPlatzCrawler(unittest.TestCase):
     def test_get_sub_types(self):
         ret_val = self.crawler.get_sub_types("")
         self.assertEqual(ret_val, [])
+        ret_val = self.crawler.get_sub_types(0)
+        self.assertEqual(ret_val, [])
 
     def test_parse_product_info(self):
         ret_val = self.crawler.parse_product_info("")
         self.assertEqual(ret_val, {})
+        ret_val = self.crawler.parse_product_info(0)
+        self.assertEqual(ret_val, {})
 
     def test_get_product_url(self):
         ret_val = self.crawler.get_product_url("")
+        self.assertEqual(ret_val, "")
+        ret_val = self.crawler.get_product_url(0)
         self.assertEqual(ret_val, "")
 
 

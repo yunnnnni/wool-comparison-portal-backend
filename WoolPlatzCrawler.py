@@ -13,7 +13,7 @@ logging.basicConfig(format="[%(asctime)s] %(levelname)-8s %(filename)s:%(lineno)
 
 
 class WoolPlatzCrawler:
-    def __init__(self, account:str="SQ-119572-1", query_url:str="https://dynamic.sooqr.com/suggest/script/"):
+    def __init__(self, account: str = "SQ-119572-1", query_url: str = "https://dynamic.sooqr.com/suggest/script/"):
         self.headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Encoding": "br, gzip, deflate",
@@ -27,25 +27,39 @@ class WoolPlatzCrawler:
 
     def get_product_info(self, mark: str, product: str) -> List[Dict]:
         self.logger.debug(f"mark={mark}, product={product}")
-        product_root_url = self.get_product_url(f"{mark} {product}")
-        target_product_list = self.get_sub_types(product_root_url)
-        product_info_list = []
-        for target_product in target_product_list:
-            self.logger.debug(f"target_product={target_product}")
-            product_url = self.get_product_url(target_product)
-            product_info = self.parse_product_info(product_url)
-            if len(product_info) > 0:
-                product_info_list.append(product_info)
-                time_to_sleep = randint(100, 1000) / 1000
-                self.logger.debug(f"time_to_sleep={time_to_sleep}")
-                time.sleep(time_to_sleep)
-        return product_info_list
+        try:
+            if not isinstance(mark, str):
+                raise TypeError("mark is not a string!")
+            if not mark:
+                raise ValueError("mark is empty")
+            if not isinstance(product, str):
+                raise TypeError("product is not a string!")
+            if not product:
+                raise ValueError("product is empty")
+            product_root_url = self.get_product_url(f"{mark} {product}")
+            target_product_list = self.get_sub_types(product_root_url)
+            product_info_list = []
+            for target_product in target_product_list:
+                self.logger.debug(f"target_product={target_product}")
+                product_url = self.get_product_url(target_product)
+                product_info = self.parse_product_info(product_url)
+                if len(product_info) > 0:
+                    product_info_list.append(product_info)
+                    time_to_sleep = randint(100, 1000) / 1000
+                    self.logger.debug(f"time_to_sleep={time_to_sleep}")
+                    time.sleep(time_to_sleep)
+            return product_info_list
+        except Exception as e:
+            self.logger.warning(f"error={e}")
+            return ""
 
     def get_product_url(self, product_name: str) -> str:
         self.logger.debug(f"product_name={product_name}")
         try:
-            if len(product_name) == 0:
-                raise ValueError("product_name is empty")
+            if not isinstance(product_name, str):
+                raise TypeError("product_name is not a string!")
+            if not product_name:
+                raise ValueError("product_url is empty")
             query_params = {
                 "type": "suggest",
                 "searchQuery": product_name,
@@ -55,8 +69,8 @@ class WoolPlatzCrawler:
                 "account": self.account  # TODO: will account expire? get account automatically
             }
             r = requests.get(self.query_url, params=query_params, headers=self.headers)
-            html_doc = re.findall(r"\"html\":\"(.*)\"", str(r.content))[0].replace("\\\\n", " ").replace("\\\\t", " ").replace(
-                "\\\\", "")
+            html_doc = re.findall(r"\"html\":\"(.*)\"", str(r.content))[0].replace("\\\\n", " ").\
+                replace("\\\\t"," ").replace("\\\\", "")
             soup = BeautifulSoup(html_doc, "html.parser")
             product_url_list = soup.find_all("a", {"class": "productlist-imgholder"}, href=True)
             if len(product_url_list) == 0:
@@ -84,7 +98,7 @@ class WoolPlatzCrawler:
             product_info["Verfügbarkeit"] = soup.find("div", {"id": "ContentPlaceHolder1_upStockInfoDescription"}).find(
                 "span").text
             product_info["Preis"] = soup.find("span", {"class": "product-price-amount"}).text  # TODO: currency?
-            # TODO: validation
+            # TODO: validation for product_info
             specification_ele = soup.find("div", {"id": "pdetailTableSpecs"})
             tr_ele_list = specification_ele.find_all("tr")
             specification_dict = {}
@@ -107,7 +121,7 @@ class WoolPlatzCrawler:
             if not isinstance(product_url, str):
                 raise TypeError("product_url is not a string!")
             if not product_url:
-                raise ValueError("product_url is empty, can't parse product info")
+                raise ValueError("product_url is empty, can't get colors")
 
             r = requests.get(product_url, headers=self.headers)
             soup = BeautifulSoup(r.content, "html.parser")
@@ -116,7 +130,7 @@ class WoolPlatzCrawler:
             soup.find_all("div", {"class": "variants-sb-box-item"})
             sub_types = []
             for ele in soup.find_all("div", {"class": "variants-sb-box-item"}):
-                # FIXME: product name in data-list-text is not always correct
+                # FIXME: product name in data-list-text is not always correct to build corresponded url
                 try:
                     color = ele.find('span')['data-list-text']
                     sub_types.append(f"{variant_name} {color}")
@@ -132,11 +146,11 @@ class WoolPlatzCrawler:
 
 if __name__ == "__main__":
     target_list = [
-        # {"mark": "DMC", "product": "Natura XL"},
+        {"mark": "DMC", "product": "Natura XL"},
         {"mark": "Drops", "product": "Safran"},
-        # {"mark": "Drops", "product": "Baby Merino Mix"},
-        # {"mark": "Hahn", "product": "Alpacca Speciale"},
-        # {"mark": "Stylecraft", "product": "Special double knit"}
+        {"mark": "Drops", "product": "Baby Merino Mix"},
+        {"mark": "Hahn", "product": "Alpacca Speciale"},
+        {"mark": "Stylecraft", "product": "Special double knit"}
     ]
 
     crawler = WoolPlatzCrawler()
